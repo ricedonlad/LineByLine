@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LineByLine</title>
+    <style>
+        /* 기본 스타일 */
+
+        body {
+            font-family: Arial, sans-serif;
+            color: #333;
+            background-color: #f4f6f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 800px;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+            min-height: 100vh; /* 화면 높이에 맞춤 */ /*height: 100vh; */
+            overflow-y: hidden;  /* 내부 스크롤 제거 */ /* overflow-y: auto; */
+        }
+
+        /* Title bar 스타일 */
+        .title-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .title-bar button {
+            padding: 8px 16px;
+            color: white;
+            background-color: #3498db;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .title-bar button:hover {
+            background-color: #2980b9;
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: 2rem;
+            margin: 0;
+        }
+
+        /* 문장 박스 스타일 */
+        #sentence {
+            font-size: 1rem;
+            padding: 20px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            color: #0400ff;
+            background-color: #f0f8ff;
+            margin: 20px auto;
+            width: 90%;
+            word-wrap: break-word;
+            /* 긴 단어가 있을 때 자동으로 줄바꿈 */
+            white-space: normal;
+            /* 줄바꿈 허용 */
+            overflow-wrap: break-word;
+            /* 긴 내용이 박스 너비를 초과할 경우 줄바꿈 */
+        }
+
+        /* 클릭 가능한 단어의 스타일 */
+        #sentence span {
+            cursor: pointer;
+            color: blue;
+            text-decoration: none;
+        }
+
+        /* 하단 컨트롤 섹션 */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        /* 버튼 스타일 */
+        button {
+            padding: 12px 24px;
+            color: white;
+            background-color: #3498db;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        /* 진행 바 스타일 */
+        #progressContainer {
+            width: 100%;
+            background-color: #f3f3f3;
+            border-radius: 10px;
+            overflow: hidden;
+            height: 20px;
+            margin-top: 10px;
+        }
+
+        #progressBar {
+            background-color: #4caf50;
+            height: 100%;
+            width: 0%;
+        }
+
+        /* 글자 크기 조정 팝업 스타일 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            padding-top: 60px;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 400px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* 해석이 있는 박스 => 기본 스타일 및 박스 스타일 추가 */
+        .target-box {
+            background-color: #e0f2e0;
+            padding: 10px;
+            border-radius: 8px;
+            color: #006400;
+            font-weight: bold;
+        }
+
+        /* analysis-box안에 단어-뜻-품사--노트가 존재한다 => 기본 스타일 및 박스 스타일 추가 */
+        .analysis-box {
+            background-color: #fffb00;
+            padding: 10px;
+            border-radius: 8px;
+            color: #006400;
+            font-weight: bold;
+            text-align: left;
+        }
+    </style>
+    <script>
+        let sentences = JSON.parse(localStorage.getItem('translations')) || [];
+        let currentIndex = parseInt(localStorage.getItem('currentIndex'), 10) || 0;
+        let fontSize = parseInt(localStorage.getItem('fontSize'), 10) || 16;
+        let favoriteWords = JSON.parse(localStorage.getItem('favoriteWords')) || [];
+
+        let sourceLanguage = localStorage.getItem('sourceLanguage') || 'en';
+        let targetLanguage = localStorage.getItem('targetLanguage') || 'ko';
+
+        function displaySentence() {
+            const isJsonFile = localStorage.getItem('isJsonFile') === 'true';
+            const sentenceElement = document.getElementById('sentence');
+            const extraContent = document.getElementById('extraContent');
+
+            extraContent.innerHTML = ''; // Clear any previous content
+
+            if (isJsonFile) {
+                // JSON mode: retrieve data and set content
+                const jsonData = JSON.parse(localStorage.getItem('jsonData')) || [];
+                const currentData = jsonData[currentIndex];
+
+                if (currentData) {
+                    // Display Source text with non-clickable SentenceBox
+                    sentenceElement.textContent = ''; // Clear previous content
+                    const words = currentData.Source.split(' ');
+                    words.forEach(word => {
+                        const span = document.createElement('span');
+                        span.textContent = word + ' ';
+                        span.style.color = 'blue';
+                        sentenceElement.appendChild(span);
+                    });
+
+                    // Display Target in a box
+                    const targetBox = document.createElement('div');
+                    targetBox.className = 'target-box';
+                    targetBox.textContent = currentData.Target;
+                    extraContent.appendChild(targetBox);
+
+                    // Display WordAnalysis in AnalysisBox, with click event
+                    const analysisBox = document.createElement('div');
+                    analysisBox.className = 'analysis-box';
+                    currentData.WordAnalysis.forEach(item => {
+                        const entry = document.createElement('div');
+                        entry.innerHTML = `
+                    <div><strong>단어:</strong> ${item.source}</div>
+                    <div><strong>뜻:</strong> ${item.target}</div>
+                    <div><strong>품사:</strong> ${item.pos}</div>
+                    <div><strong>노트:</strong> ${item.note}</div>
+                    <hr>
+                `;
+                        entry.onclick = () => addFavorite(item.source, item.target);
+                        analysisBox.appendChild(entry);
+                    });
+                    extraContent.appendChild(analysisBox);
+                }
+
+                // Update sentence count display for JSON files
+                document.getElementById("currentIndexDisplay").textContent =
+                    `현재번호: ${currentIndex + 1} / 전체번호: ${jsonData.length}`;
+            } else {
+                // Non-JSON mode: display sentence text normally
+                if (currentIndex >= sentences.length) {
+                    alert("끝 자료입니다.");
+                    return;
+                }
+
+                // Set up SentenceBox content with clickable words
+                sentenceElement.textContent = '';
+                const words = sentences[currentIndex].split(' ');
+                words.forEach(word => {
+                    const span = document.createElement('span');
+                    span.textContent = word + ' ';
+                    span.style.cursor = 'pointer';
+                    span.style.color = 'blue';
+                    span.onclick = () => handleWordClick(word);
+                    sentenceElement.appendChild(span);
+                });
+
+                // Update sentence count display for non-JSON files
+                document.getElementById("currentIndexDisplay").textContent =
+                    `현재번호: ${currentIndex + 1} / 전체번호: ${sentences.length}`;
+            }
+
+            sentenceElement.style.fontSize = fontSize + 'px';
+            updateProgressBar();
+            localStorage.setItem('currentIndex', currentIndex);
+        }
+
+        function updateProgressBar() {
+            const progress = ((currentIndex + 1) / sentences.length) * 100;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+        }
+
+        function translateSentence() {
+            const sentence = sentences[currentIndex];
+            const url = `https://translate.google.com/?sl=${sourceLanguage}&tl=${targetLanguage}&text=${encodeURIComponent(sentence)}&op=translate`;
+            window.open(url, '_blank');
+        }
+
+        function handleWordClick(word) {
+            if (confirm(`${word}를 즐겨찾기에 추가할까요?`)) {
+                favoriteWords.push(word);
+                localStorage.setItem('favoriteWords', JSON.stringify(favoriteWords));
+                alert(`${word}가 즐겨찾기에 추가되었습니다.`);
+            }
+            openDictionary(word);
+        }
+
+        function openDictionary(word) {
+            const fullLanguageName = getFullLanguageName(targetLanguage);
+            const url = `https://www.google.com/search?q=${encodeURIComponent(word)}+definition+in+${fullLanguageName}`;
+            window.open(url, '_blank');
+        }
+
+        function getFullLanguageName(code) {
+            const languages = {
+                'ko': 'Korean',
+                'en': 'English',
+                'es': 'Spanish'
+            };
+            return languages[code] || code;
+        }
+        document.addEventListener('DOMContentLoaded', function () {
+            // 이전 문장
+            function showPreviousSentence() {
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    displaySentence();
+                    // 스크롤을 맨 위로 이동
+                    document.documentElement.scrollTo({ top: 0, behavior: 'smooth' }); // window.scrollTo({ top: 0, behavior: 'smooth' }); 
+                } else {
+                    alert("첫 자료입니다.");
+                }
+            }
+
+            // 다음 문장
+            function showNextSentence() {
+                const isJsonFile = localStorage.getItem('isJsonFile') === 'true';
+                const jsonData = isJsonFile ? JSON.parse(localStorage.getItem('jsonData')) || [] : sentences;
+
+                if (currentIndex < sentences.length - 1) {
+                    currentIndex++;
+                    displaySentence();
+                    // 스크롤을 맨 위로 이동
+                    document.documentElement.scrollTo({ top: 0, behavior: 'smooth' }); // window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    alert("끝 자료입니다.");
+                }
+            }
+
+            // 버튼 클릭 이벤트에 함수 추가
+            document.querySelector("button[onclick='showPreviousSentence()']").addEventListener("click", showPreviousSentence);
+            document.querySelector("button[onclick='showNextSentence()']").addEventListener("click", showNextSentence);
+        });
+
+        function speak() {
+            const sentence = sentences[currentIndex];
+            const utterance = new SpeechSynthesisUtterance(sentence);
+            utterance.lang = sourceLanguage;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function showFontSizeModal() {
+            document.getElementById("fontSizeModal").style.display = "block";
+        }
+
+        function setFontSize(size) {
+            fontSize = size;
+            localStorage.setItem('fontSize', fontSize);
+            displaySentence();
+            closeFontSizeModal();
+        }
+
+        function closeFontSizeModal() {
+            document.getElementById("fontSizeModal").style.display = "none";
+        }
+
+        function goToHome() {
+            window.location.href = 'index.html'; // Replace with actual index URL
+        }
+
+        function goToFavorites() {
+            window.location.href = 'page3.html'; // Replace with actual page3 URL
+        }
+
+        function displayJsonContentIfAvailable() {
+            const isJsonFile = localStorage.getItem('isJsonFile') === 'true';
+            const sentenceElement = document.getElementById('sentence');
+            const extraContent = document.getElementById('extraContent');
+
+            extraContent.innerHTML = ''; // 기존 내용 초기화
+
+            if (isJsonFile) {
+                const jsonData = JSON.parse(localStorage.getItem('jsonData')) || [];
+                const currentData = jsonData[currentIndex];
+
+                if (currentData) {
+                    // 파란색 박스에 Source 값 표시
+                    sentenceElement.textContent = currentData.Source;
+
+                    // 녹색 박스에 Target 값 표시
+                    const targetBox = document.createElement('div');
+                    targetBox.className = 'target-box';
+                    targetBox.textContent = currentData.Target;
+                    extraContent.appendChild(targetBox);
+
+                    // 보라색 박스에 WordAnalysis 값 표시
+                    const analysisBox = document.createElement('div');
+                    analysisBox.className = 'analysis-box';
+
+                    currentData.WordAnalysis.forEach(item => {
+                        const entry = document.createElement('div');
+                        entry.innerHTML = `
+                    <div><strong>단어:</strong> ${item.source}</div>
+                    <div><strong>뜻:</strong> ${item.target}</div>
+                    <div><strong>품사:</strong> ${item.pos}</div>
+                    <div><strong>노트:</strong> ${item.note}</div>
+                    <hr>
+                `;
+
+                        // 각 `entry`에 대해 클릭 이벤트를 추가
+                        entry.onclick = function () {
+                            addFavorite(item.source, item.target);
+                        };
+
+                        analysisBox.appendChild(entry);
+                    });
+
+                    extraContent.appendChild(analysisBox);
+                }
+            }
+            setupAnalysisBoxClick();  // 여기서 호출
+        }
+
+        function addFavorite(word, meaning) {
+            word = word.trim();  // Trim spaces from the word
+
+            // Only proceed if the word is not blank
+            if (word && confirm(`${word}를 즐겨찾기에 추가할까요?`)) {
+                let favoriteWords = JSON.parse(localStorage.getItem('favoriteWords')) || [];
+                let wordMeanings = JSON.parse(localStorage.getItem('wordMeanings')) || {};
+
+                // Only add the word if it's not already in the list and it's not empty
+                if (!favoriteWords.includes(word)) {
+                    favoriteWords.push(word);
+                    wordMeanings[word] = meaning;
+                }
+
+                // Save the updated lists back to localStorage
+                localStorage.setItem('favoriteWords', JSON.stringify(favoriteWords));
+                localStorage.setItem('wordMeanings', JSON.stringify(wordMeanings));
+                alert(`${word}가 즐겨찾기에 추가되었습니다.`);
+            }
+        }
+
+        function setupAnalysisBoxClick() {
+            const isJsonFile = localStorage.getItem('isJsonFile') === 'true';
+            if (isJsonFile) {
+                // Reset SentenceBox click events if needed
+                const sentenceBox = document.getElementById('sentence');
+                sentenceBox.onclick = null;
+
+                // Set up AnalysisBox click events
+                const analysisItems = document.querySelectorAll('.analysis-box div');
+                analysisItems.forEach(item => {
+                    const word = item.querySelector('div:nth-child(1)').textContent.split(': ')[1].trim(); // 단어 추출
+                    const meaning = item.querySelector('div:nth-child(2)').textContent.split(': ')[1].trim(); // 뜻 추출
+
+                    item.onclick = function () {
+                        addFavorite(word, meaning); // 정확한 값 전달
+                    };
+                });
+            }
+        }
+
+        window.onload = function () {
+            displaySentence(); // Initialize display on page load
+
+            updateProgressBar();  // Initialize the progress bar display
+        };
+
+        window.scrollTo({
+            top: 0,
+            left: 0,
+            behavior: 'smooth'
+        });
+
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Title and Navigation Buttons -->
+        <div class="title-bar">
+            <button onclick="goToHome()">HOME</button>
+            <h1>LineByLine</h1>
+            <button onclick="goToFavorites()">즐겨찾기</button>
+        </div>
+
+        <!-- Sentence Display -->
+        <div id="sentence"></div>
+        <div id="extraContent"></div>
+        <!-- Control Buttons -->
+        <div class="controls">
+            <button onclick="showPreviousSentence()">이전</button>
+            <button onclick="showNextSentence()">다음</button>
+            <button onclick="speak()">발음하기</button>
+            <button onclick="showFontSizeModal()">글자 크기 조정</button>
+            <button onclick="translateSentence()">문장 번역</button>
+        </div>
+
+        <!-- Progress Bar -->
+        <div id="progressContainer">
+            <div id="progressBar"></div>
+        </div>
+        <div id="currentIndexDisplay">현재번호: 1 / 전체번호: 0</div>
+    </div>
+
+    <!-- Font Size Adjustment Modal -->
+    <div id="fontSizeModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeFontSizeModal()">&times;</span>
+            <h2>글자 크기 조정</h2>
+            <button onclick="setFontSize(12)">12px</button>
+            <button onclick="setFontSize(16)">16px</button>
+            <button onclick="setFontSize(20)">20px</button>
+            <button onclick="setFontSize(24)">24px</button>
+            <button onclick="setFontSize(28)">28px</button>
+            <button onclick="setFontSize(32)">32px</button>
+            <button onclick="setFontSize(36)">36px</button>
+            <button onclick="setFontSize(40)">40px</button>
+        </div>
+    </div>
+</body>
+
+</html>

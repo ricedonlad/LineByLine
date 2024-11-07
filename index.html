@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LineByLine</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <style>
+        /* Center content */
+        body {
+            font-family: Arial, sans-serif;
+            color: #333;
+            background-color: #f4f6f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        /* Main container styling */
+        .container {
+            text-align: center;
+            max-width: 600px;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        p,
+        select,
+        textarea,
+        button {
+            margin: 10px 0;
+            font-size: 1rem;
+        }
+
+        /* Button styling */
+        button {
+            padding: 10px 20px;
+            color: white;
+            background-color: #3498db;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        /* Specific styling for layout */
+        #fileNameDisplay {
+            display: block;
+            margin-top: 5px;
+            font-style: italic;
+            color: #666;
+            cursor: pointer;
+        }
+
+        /* Align "텍스트 입력" button to the right of textarea */
+        .text-input-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 5px;
+        }
+
+        /* Center navigation buttons and adjust spacing */
+        .navigation-buttons {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            /* Adjust the gap between buttons */
+        }
+    </style>
+
+    <script>
+        let targetLanguage = localStorage.getItem('targetLanguage') || 'ko';
+        let sourceLanguage = localStorage.getItem('sourceLanguage') || 'en';
+        let sentences = [];
+
+        // Save data and reset progress
+        function saveData(data) {
+            localStorage.setItem('translations', JSON.stringify(data));
+            localStorage.setItem('currentIndex', 0); // Reset progress when new data is uploaded
+        }
+
+        // Handle file upload and sentence processing // JSON 파일을 업로드할 때 데이터를 `localStorage`에 저장하는 함수
+        async function handleFileUpload(file) {
+            if (!file) return;
+
+            if (file.type === 'application/pdf') {
+                const text = await extractTextFromPDF(file);
+                sentences = splitSentences(text);
+                localStorage.setItem('isJsonFile', 'false');  // PDF 파일임을 표시
+                localStorage.setItem('uploadedFileContent', JSON.stringify(sentences));  // 문장 배열 저장
+//                alert("PDF 파일이 업로드되었습니다. 다음 페이지로 이동하세요.");
+            } else if (file.type === 'application/json') {
+                const text = await file.text();
+                const jsonData = JSON.parse(text);
+
+                // JSON 파일 유효성 검사 및 저장
+                if (Array.isArray(jsonData) && jsonData.every(item => item.hasOwnProperty("Source"))) {
+                    localStorage.setItem('isJsonFile', 'true');  // JSON 파일임을 표시
+                    localStorage.setItem('jsonData', JSON.stringify(jsonData));  // JSON 전체 저장
+
+                    sentences = jsonData.map(item => item["Source"]);  // Source 문장만 추출
+                    localStorage.setItem('uploadedFileContent', JSON.stringify(sentences));  // 문장 배열 저장
+ //                   alert("JSON 파일이 업로드되었습니다. 다음 페이지로 이동하세요.");
+                } else {
+                    alert("올바르지 않은 JSON 형식입니다.");
+                    return;
+                }
+            } else if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+                const text = await file.text();
+                sentences = splitSentences(text);
+                localStorage.setItem('isJsonFile', 'false');  // 텍스트 파일임을 표시
+                localStorage.setItem('uploadedFileContent', JSON.stringify(sentences));  // 문장 배열 저장
+                alert("텍스트 파일이 업로드되었습니다. 다음 페이지로 이동하세요.");
+            } else {
+                alert("지원되지 않는 파일 형식입니다.");
+                return;
+            }
+
+            // Save file name and content to localStorage
+            localStorage.setItem('uploadedFileName', file.name);
+            localStorage.setItem('uploadedFileContent', JSON.stringify(sentences)); // Store sentences array
+            document.getElementById('fileNameDisplay').textContent = file.name;
+
+            saveData(sentences);
+            alert("파일 업로드 완료! 다음 페이지로 이동하세요.");
+        }
+
+        async function extractTextFromPDF(file) {
+            const pdf = await pdfjsLib.getDocument(URL.createObjectURL(file)).promise;
+            let text = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                const pageText = content.items.map(item => item.str).join(' ');
+                text += pageText + '\n';
+            }
+            return text;
+        }
+
+        function splitSentences(text) {
+            return text.split(/(?<=[.!?])\s+/);
+        }
+
+        function showFileInput() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.pdf, .txt, .json';
+            fileInput.onchange = async (event) => {
+                const file = event.target.files[0];
+                // await handleFileUpload(file);
+
+                // Clear text input and reset localStorage data
+                document.getElementById("textInput").value = ''; // Clear text input
+                localStorage.removeItem('translations'); // Clear previous translations data
+                localStorage.removeItem('currentIndex'); // Reset progress
+
+                await handleFileUpload(file);
+            };
+            fileInput.click();
+        }
+
+        function handleTextInput() {
+            const text = document.getElementById("textInput").value;
+            if (text.trim()) {
+                sentences = splitSentences(text);
+                saveData(sentences);
+                alert("텍스트 입력 완료! 다음 페이지로 이동하세요.");
+            } else {
+                alert("텍스트를 입력하세요.");
+            }
+        }
+
+        function loadLanguageSettings() {
+            document.getElementById('sourceLanguageSelect').value = sourceLanguage;
+            document.getElementById('targetLanguageSelect').value = targetLanguage;
+        }
+
+        function changeSourceLanguage() {
+            sourceLanguage = document.getElementById("sourceLanguageSelect").value;
+            localStorage.setItem('sourceLanguage', sourceLanguage);
+        }
+
+        function changeTargetLanguage() {
+            targetLanguage = document.getElementById("targetLanguageSelect").value;
+            localStorage.setItem('targetLanguage', targetLanguage);
+        }
+
+        window.onload = function () {
+            const uploadedFileName = localStorage.getItem('uploadedFileName');
+            const uploadedFileContent = localStorage.getItem('uploadedFileContent');
+
+            if (uploadedFileName && uploadedFileContent) {
+                document.getElementById('fileNameDisplay').textContent = uploadedFileName;
+
+                // 파일 이름 클릭 시 파일 사용 가능
+                document.getElementById('fileNameDisplay').onclick = function () {
+                    alert("파일 업로드 완료! 다음 페이지로 이동하세요.");
+                    sentences = JSON.parse(uploadedFileContent); // Load sentences from saved content
+                    saveData(sentences);
+                };
+            }
+
+            loadLanguageSettings();
+        };
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <h1>LineByLine</h1>
+
+        <!-- User instructions -->
+        <p>새 파일을 업로드 하거나, 텍스트를 직접 입력한 후 "다음 페이지" 버튼을 누르세요.<br>
+            이전 자료들을 이용하고 싶으면 바로 "다음 페이지" 버튼을 누르세요.</p>
+
+        <!-- Language selection -->
+        <p>소스 언어를 선택하세요:</p>
+        <select id="sourceLanguageSelect" onchange="changeSourceLanguage();">
+            <option value="en">영어</option>
+            <option value="ko">한국어</option>
+            <option value="es">스페인어</option>
+        </select>
+
+        <p>타겟 언어를 선택하세요:</p>
+        <select id="targetLanguageSelect" onchange="changeTargetLanguage();">
+            <option value="ko">한국어</option>
+            <option value="en">영어</option>
+            <option value="es">스페인어</option>
+        </select>
+
+        <!-- File upload section -->
+        <div style="margin-top: 10px;">
+            <button onclick="showFileInput()">파일 업로드</button>
+            <span id="fileNameDisplay"></span>
+        </div>
+
+        <!-- Text input section with aligned button -->
+        <p>또는 텍스트를 직접 입력하세요:</p>
+        <textarea id="textInput" rows="5" cols="40" placeholder="텍스트를 여기에 붙여넣기..."></textarea>
+        <div class="text-input-container">
+            <button onclick="handleTextInput()">텍스트 입력</button>
+        </div>
+
+        <!-- Page navigation buttons centered with spacing -->
+        <div class="navigation-buttons">
+            <button id="nextPage" onclick="location.href='page2.html'">다음 페이지로</button>
+            <button id="bookmarkPage" onclick="location.href='page3.html'">즐겨찾기 보기</button>
+        </div>
+    </div>
+</body>
+
+</html>

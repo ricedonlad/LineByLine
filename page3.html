@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LineByLine - Favorite Words</title>
+    <style>
+        /* Body and container styles */
+        body {
+            font-family: Arial, sans-serif;
+            color: #333;
+            background-color: #f4f6f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            height: 100vh;
+        }
+        .container {
+            text-align: center;
+            max-width: 800px;
+            width: 90%;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+            max-height: 90vh;
+        }
+
+        /* Title and main action buttons */
+        h1 {
+            color: #2c3e50;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+        }
+        .top-buttons {
+            display: flex;
+            justify-content: center; /* Center align */
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .top-buttons button {
+            padding: 10px 16px;
+            color: white;
+            background-color: #3498db;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+        .top-buttons button:hover {
+            background-color: #2980b9;
+        }
+
+        /* Word list styles */
+        .word-item {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            background-color: #f0f8ff;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        /* Word item buttons layout */
+        .word-buttons {
+            display: flex;
+            gap: 5px;
+            order: -1; /* Place buttons before the word */
+        }
+        .word-buttons button {
+            padding: 8px;
+            font-size: 0.8rem;
+            border: none;
+            border-radius: 4px;
+            background-color: #3498db;
+            color: white;
+            cursor: pointer;
+        }
+        .word-buttons button:hover {
+            background-color: #2980b9;
+        }
+
+        /* Icon button styles */
+        .icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            vertical-align: middle;
+        }
+
+        /* Meaning display styling */
+/* 뜻의 스타일 - 단어와 간격 추가 */
+.meaning {
+    background-color: #e0f2e0;
+    color: #006400;
+    border-radius: 4px;
+    padding: 5px;
+    font-weight: bold;
+    display: none;
+    margin-top: 8px; /* 단어와 뜻 사이의 간격 */
+}
+
+/* Spacing between buttons and word */
+/* 버튼과 단어 사이 간격 */
+.word-buttons {
+    margin-right: 15px; /* 버튼과 단어 사이의 간격 */
+}
+
+/* Word box styling */
+/* 단어 박스 스타일 - 배경색 변경 */
+/* 단어 박스 스타일 - 더 진한 파란 배경색 */
+.word-label {
+    padding: 5px 10px;
+    background-color: #b3e5fc; /* 더 진한 파란 배경색 */
+    border-radius: 4px;
+    color: #3498db;
+    font-weight: bold;
+    display: inline-block;
+    margin-top: 5px; /* 단어와 버튼 사이 간격 */
+}
+
+    </style>
+    <script>
+        let favoriteWords = JSON.parse(localStorage.getItem('favoriteWords')) || [];
+        let wordMeanings = JSON.parse(localStorage.getItem('wordMeanings')) || {};
+
+        function saveFavorites() {
+            localStorage.setItem('favoriteWords', JSON.stringify(favoriteWords));
+            localStorage.setItem('wordMeanings', JSON.stringify(wordMeanings));
+        }
+
+function toggleMeaning(word) {
+    const meaningElement = document.getElementById(`meaning-${word}`);
+    meaningElement.style.display = meaningElement.style.display === 'block' ? 'none' : 'block';
+}
+
+        function removeFavorite(word) {
+            favoriteWords = favoriteWords.filter(favWord => favWord !== word);
+            delete wordMeanings[word];
+            saveFavorites();
+            renderFavoriteWords();
+        }
+
+        function clearFavorites() {
+            if (confirm("즐겨찾기 단어를 모두 삭제하시겠습니까?")) {
+                favoriteWords = [];
+                wordMeanings = {};
+                saveFavorites();
+                renderFavoriteWords();
+            }
+        }
+
+        function editMeaning(word) {
+            const meaningInput = document.getElementById(`meaning-input-${word}`);
+            meaningInput.style.display = 'block';
+            meaningInput.focus();
+        }
+
+        function saveMeaning(word) {
+            const meaningInput = document.getElementById(`meaning-input-${word}`);
+            wordMeanings[word] = meaningInput.value;
+            saveFavorites();
+            renderFavoriteWords();
+        }
+
+        function exportFavorites() {
+            const data = { favoriteWords: favoriteWords, wordMeanings: wordMeanings };
+            exportToJsonFile(data, 'favorite_words.json');
+        }
+
+        function exportToJsonFile(jsonData, fileName) {
+            const dataStr = JSON.stringify(jsonData, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function goToHome() {
+            window.location.href = 'index.html'; // Replace with actual homepage URL
+        }
+
+        function renderFavoriteWords() {
+            const listContainer = document.getElementById('favoriteList');
+            listContainer.innerHTML = '';
+
+            favoriteWords.forEach(word => {
+                const wordContainer = document.createElement('div');
+                wordContainer.className = 'word-item';
+
+                const wordButtons = document.createElement('div');
+                wordButtons.className = 'word-buttons';
+
+                const showMeaningButton = document.createElement('button');
+                showMeaningButton.innerHTML = '<span class="icon">&#128214;</span>';
+                showMeaningButton.onclick = () => toggleMeaning(word);
+                wordButtons.appendChild(showMeaningButton);
+
+                const removeButton = document.createElement('button');
+                removeButton.innerHTML = '<span class="icon">&#9825;</span>';
+                removeButton.onclick = () => removeFavorite(word);
+                wordButtons.appendChild(removeButton);
+
+                const editButton = document.createElement('button');
+                editButton.innerHTML = '<span class="icon">&#9998;</span>';
+                editButton.onclick = () => editMeaning(word);
+                wordButtons.appendChild(editButton);
+
+                const saveButton = document.createElement('button');
+                saveButton.innerHTML = '<span class="icon">&#128190;</span>';
+                saveButton.onclick = () => saveMeaning(word);
+                wordButtons.appendChild(saveButton);
+
+                wordContainer.appendChild(wordButtons);
+
+const wordLabel = document.createElement('span');
+wordLabel.className = 'word-label'; // 새로운 클래스 추가 (박스 스타일)
+wordLabel.textContent = word; // 단어 내용을 설정
+wordContainer.appendChild(wordLabel); // 단어를 단어 컨테이너에 추가
+
+                const meaningDisplay = document.createElement('div');
+                meaningDisplay.id = `meaning-${word}`;
+                meaningDisplay.className = 'meaning';
+                meaningDisplay.textContent = wordMeanings[word] || '';
+                wordContainer.appendChild(meaningDisplay);
+
+                const meaningInput = document.createElement('textarea');
+                meaningInput.id = `meaning-input-${word}`;
+                meaningInput.rows = 2;
+                meaningInput.style.display = 'none';
+                meaningInput.placeholder = '단어 뜻을 입력하세요...';
+                meaningInput.value = wordMeanings[word] || '';
+                meaningInput.onblur = () => saveMeaning(word);
+
+                wordContainer.appendChild(meaningInput);
+                listContainer.appendChild(wordContainer);
+            });
+        }
+
+        window.onload = function() {
+            renderFavoriteWords();
+        };
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>즐겨찾기 단어 목록</h1>
+        
+        <!-- Top action buttons -->
+        <div class="top-buttons">
+            <button onclick="goToHome()">홈으로 가기</button>
+            <button onclick="clearFavorites()">전체 즐겨찾기 삭제</button>
+            <button onclick="exportFavorites()">데이터 내보내기</button>
+        </div>
+        
+        <!-- Favorite words list -->
+        <div id="favoriteList"></div>
+    </div>
+</body>
+</html>
